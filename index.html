@@ -588,8 +588,8 @@
         //jsPsych.data.localSave("resample_v1_"+subject_id+".csv","csv")
         //below script is for storing data locally once the experiment is online
         //saveData("resample_v1_"+subject_id+".csv", jsPsych.data.dataAsCSV());
-        console.log(jsPsych.data.dataAsJSON());
-        console.log(jsPsych.data.dataAsCSV())
+        console.log(jsPsych.data.get().json());
+        console.log(jsPsych.data.get().csv())
 
         //add date to output to ensure no duplicated files
         const date = new Date();
