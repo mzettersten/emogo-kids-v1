@@ -583,11 +583,6 @@
     timeline: timeline,
     show_progress_bar: true,
     on_finish: function(data) {
-        //for testing: display data and store locally
-        //jsPsych.data.displayData("csv");
-        //jsPsych.data.localSave("resample_v1_"+subject_id+".csv","csv")
-        //below script is for storing data locally once the experiment is online
-        //saveData("resample_v1_"+subject_id+".csv", jsPsych.data.dataAsCSV());
         console.log(jsPsych.data.get().json());
         console.log(jsPsych.data.get().csv())
 
@@ -605,8 +600,8 @@
           },
           body: JSON.stringify({
             experimentID: "m4lN0jeU0Lrk",
-            filename: "emogo_v1_" + subject_id + "_" + dateString + ".csv",
-            data: jsPsych.data.dataAsCSV(),
+            filename: "emogo_kids_v1_" + subject_id + "_" + dateString + ".csv",
+            data: jsPsych.data.get().csv(),
           }),
         });
       //jsPsych.data.displayData();
