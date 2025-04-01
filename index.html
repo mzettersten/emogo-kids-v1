@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <script src="jsPsych-6.3.1/jspsych.js"></script>
+  <script src="jsPsych-6.3.1/examples/js/snap.svg-min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/seedrandom/3.0.5/seedrandom.min.js"></script>
+  <script src="jspsych-explore-choice.js"></script>
+  <script src="jspsych-show-reward.js"></script>
+  <script src="jsPsych-6.3.1/plugins/jspsych-instructions.js"></script>
+  <script src="jsPsych-6.3.1/plugins/jspsych-preload.js"></script>
+  <script src="jsPsych-6.3.1/plugins/jspsych-image-button-response.js"></script>
+  <script src="jsPsych-6.3.1/plugins/jspsych-html-button-response.js"></script>
+  <script src="jsPsych-6.3.1/plugins/jspsych-survey-text.js"></script>
+  <script src="jsPsych-6.3.1/plugins/jspsych-fullscreen.js"></script>
+  <script src="jsPsych-6.3.1/plugins/jspsych-survey-text.js"></script>
+  <script src="jsPsych-6.3.1/plugins/jspsych-survey-multi-choice.js"></script>
+  <script src="jsPsych-6.3.1/plugins/jspsych-survey-multi-select.js"></script>
+  <script src="jsPsych-6.3.1/plugins/jspsych-html-slider-response.js"></script>
+  <link rel="stylesheet" href="jsPsych-6.3.1/css/jspsych.css">
+  <!-- <script type="text/javascript" src="lib/vendors/jquery-2.2.0.min.js"></script>
+  <script type="text/javascript" src="lib/jspsych-pavlovia-3.2.5.js"></script> -->
+</head>
+<body></body>
+<script>
+
+  // generate a random subject ID (just to be safe)
+var subject_id_num = Math.floor(Math.random()*1000000);
+subject_id="p"+subject_id_num.toString();
+console.log(subject_id);
+
+//general function for grabbing parameter from a URL
+function getParamFromURL( name ) {
+  name = name.replace(/[\[]/,"\\[").replace(/[\]]/,"\\]");
+  var regexS = "[\?&]"+name+"=([^&#]*)";
+  var regex = new RegExp( regexS );
+  var results = regex.exec( window.location.href );
+  if( results == null )
+    return "";
+  else
+    return results[1];
+}
+
+//set random seed
+var random_seed = getParamFromURL( 'seed' );
+//make sure that nobody can enter anything damaging or crazy for seed
+random_seed.replace(/[^A-Za-z0-9_]/g, "");
+console.log(random_seed);
+//set to subject id num if no seed set
+if (random_seed == "") {
+  random_seed=subject_id_num;
+} 
+console.log(random_seed);
+Math.seedrandom(random_seed);
+
+
+
+  //define permutation functions
+  const rotations = ([l, ...ls], rs = []) => 
+  l == undefined ? [] : [[l, ...ls, ...rs], ... rotations (ls, [...rs, l])]
+
+const permutations = ([l, ...ls]) =>
+  l == undefined ? [[]] : [...permutations (ls) .flatMap (p => rotations ([l, ...p])) ]
+
+
+// function for generating a normal distribution between [0,1]
+// source: https://stackoverflow.com/questions/25582882/javascript-math-random-normal-distribution-gaussian-bell-curve/36481059#36481059
+  function randn_bm() {
+  let u = 0, v = 0;
+  while(u === 0) u = Math.random(); //Converting [0,1) to (0,1)
+  while(v === 0) v = Math.random();
+  let num = Math.sqrt( -2.0 * Math.log( u ) ) * Math.cos( 2.0 * Math.PI * v );
+  num = num / 10.0 + 0.5; // Translate to 0 -> 1
+  if (num > 1 || num < 0) return randn_bm() // resample between 0 and 1
+  return num
+}
+
+// function for generating reward (with noise)
+function compute_reward(reward,noise_type,reward_adj_factor,reward_adj_shift) {
+  //compute reward noise
+  if (noise_type == "normal") {
+    reward_noise = Math.floor(randn_bm()*reward_adj_factor)-reward_adj_shift;
+  } else if (noise_type == "uniform") {
+    reward_noise = Math.floor(Math.random()*reward_adj_factor)-reward_adj_shift;
+  } else {
+    reward_noise = 0;
+  }
+  updated_reward = reward + reward_noise
+  return updated_reward
+}
+
+
+
+// ORGANIZE SUBJECT ID & GENERAL PARAMETERS
+
+  // get participant-specific url parameters from mTurk study link
+  var workerId = getParamFromURL('workerId');
+  var assignmentId = getParamFromURL('assignmentId');
+  var hitId = getParamFromURL('hitId');
+
+  var survey_code = getParamFromURL('id');
+
+  //make sure that nobody can enter anything damaging
+  workerId.replace(/[^A-Za-z0-9_]/g, "");
+  hitId.replace(/[^A-Za-z0-9_]/g, "");
+  assignmentId.replace(/[^A-Za-z0-9_]/g, "");
+
+  console.log(workerId);
+  console.log(hitId);
+  console.log(assignmentId);
+
+  var timeline=[];
+
+  /* init connection with pavlovia.org */
+  //var pavlovia_init = {
+  //  type: "pavlovia",
+  //  command: "init"
+  //};
+
+  // timeline.push(pavlovia_init);
+
+  //create conditions based on url parameters
+  var structure_conditions = ["emotion","model"];
+  var match_conditions = ["match","mismatch"];
+  //var structure_condition = jsPsych.randomization.sampleWithoutReplacement(structure_conditions)[0];
+  //var match_condition = jsPsych.randomization.sampleWithoutReplacement(match_conditions)[0];
+
+  var structure_temp = getParamFromURL('struc');
+  var match_temp = getParamFromURL('mat');
+  if (structure_temp=="e") {
+    var structure_condition = "emotion"
+  } else if (structure_temp=="m") {
+    var structure_condition = "model"
+  } else {
+    var structure_condition = jsPsych.randomization.sampleWithoutReplacement(structure_conditions)[0];
+  }
+  if (match_temp=="ma") {
+    var match_condition = "match"
+  } else if (match_temp=="mi") {
+    var match_condition = "mismatch"
+  } else {
+    var match_condition = jsPsych.randomization.sampleWithoutReplacement(match_conditions)[0];
+  }
+
+  //create reward parameters
+  var rewards = [1,2,5,10];
+  var reward_depiction_factor = 1;
+  var reward_adj_factor = 1;
+  var reward_adj_shift = 0;
+  var noise_type = "uniform";
+
+  // record information in the jsPsych data
+  // this adds a property called 'subject', a property called workerId, and a condition property
+  jsPsych.data.addProperties({
+    subject: subject_id,
+    workerId: workerId,
+    hitId: hitId,
+    assignmentId: assignmentId,
+    experiment_id: 979,
+    survey_code: survey_code,
+    structure_condition: structure_condition,
+    match_condition: match_condition,
+    seed: random_seed,
+    noise_type: noise_type
+  });
+
+
+  var reward_index = [0,1,2,3];
+  reward_index_1 = jsPsych.randomization.shuffle(reward_index);
+  reward_index_2 = jsPsych.randomization.shuffle(reward_index);
+
+  var models = ["AF02", "AF09", "AF10", "AF11","AM03","AM05","AM06","AM09","BF04","BF05","BF06","BF08","BM03", "BM04", "BM07", "BM16","HF02", "HF04", "HF09", "HF10","HM02", "HM07", "HM09", "HM10","WF04", "WF06", "WF11", "WF14","WM07", "WM09", "WM11", "WM13"];
+  var emotions = ["AO","CC","DO","FO","HE","HO","SC","SUR"];
+
+  var num_options = 4
+
+  var models_1 = jsPsych.randomization.sampleWithoutReplacement(models, num_options);
+  var emotions_1 = jsPsych.randomization.sampleWithoutReplacement(emotions, num_options);
+
+  console.log(models_1)
+  console.log(emotions_1)
+
+  //remove the initially selected models from set 1
+  var models_2_sample_set = models.filter( function( el ) {
+  return models_1.indexOf( el ) < 0;
+} );
+
+  console.log(models_2_sample_set)
+  
+  //select models for set 2
+  var models_2 = jsPsych.randomization.sampleWithoutReplacement(models_2_sample_set, num_options);
+
+  //select emotions for set 2 by removing already used emotions
+  var emotions_2_select = emotions.filter( function( el ) {
+  return emotions_1.indexOf( el ) < 0;
+} );
+  //shuffle emotions
+  var emotions_2 = jsPsych.randomization.shuffle(emotions_2_select);
+
+  console.log(emotions_2)
+  console.log(models_2)
+
+  //create reward matrix
+  reward_matrix_1 = {};
+  reward_matrix_2 = {};
+  console.log(structure_condition);
+  console.log(match_condition);
+
+  if (structure_condition == "model") {
+    reward_vector_1 = models_1 
+    if (match_condition=="match") {
+      reward_vector_2 = models_2
+    } else if (match_condition=="mismatch") {
+      reward_vector_2 = emotions_2
+    }
+  } else if (structure_condition == "emotion") {
+    reward_vector_1 = emotions_1 
+    if (match_condition=="match") {
+      reward_vector_2 = emotions_2
+    } else if (match_condition=="mismatch") {
+      reward_vector_2 = models_2
+    }
+  }
+
+  for (k=0; k<reward_vector_1.length; k++) {
+    cur_reward_key = reward_vector_1[k];
+    cur_reward_index = reward_index_1[k];
+    cur_reward = rewards[cur_reward_index];
+    reward_matrix_1[cur_reward_key] = {"reward": cur_reward}
+  }
+
+  for (l=0; l<reward_vector_2.length; l++) {
+    cur_reward_key = reward_vector_2[l];
+    cur_reward_index = reward_index_2[l];
+    cur_reward = rewards[cur_reward_index];
+    reward_matrix_2[cur_reward_key] = {"reward": cur_reward}
+  }
+
+  console.log(reward_matrix_1);
+  console.log(reward_matrix_2);
+
+//put together images
+var img_ext = ".jpg";
+var img_sep = "_";
+var all_images_1 = []
+for (i=0; i<emotions_1.length; i++) {
+  for (j=0; j<models_1.length; j++) {
+    all_images_1.push("stimuli/"+models_1[j]+img_sep+emotions_1[i]+img_ext)
+  }
+}
+
+var all_images_2 = []
+for (i=0; i<emotions_2.length; i++) {
+  for (j=0; j<models_2.length; j++) {
+    all_images_2.push("stimuli/"+models_2[j]+img_sep+emotions_2[i]+img_ext)
+  }
+}
+
+console.log(all_images_1);
+console.log(all_images_2);
+
+var all_images = all_images_1.concat(all_images_2);
+
+var reward_images = [
+"stimuli/stars_9.png",
+"stimuli/stars_7.png",
+"stimuli/stars_5.png",
+"stimuli/stars_3.png",
+"stimuli/stars_12.png",
+"stimuli/stars_11.png",
+"stimuli/stars_10.png",
+"stimuli/stars_1.png",
+"stimuli/stars_0.png",
+"stimuli/stars_8.png",
+"stimuli/stars_6.png",
+"stimuli/stars_4.png",
+"stimuli/stars_2.png"
+];
+
+
+// CREATE ALL UNIQUE EMOTION/ MODEL COMBINATIONS
+
+var all_unique_trial_combinations_1 = [];
+var all_unique_trial_combinations_2 = [];
+
+//create all reorderings of model
+var model_1_combinations =permutations(models_1);
+console.log(model_1_combinations)
+var model_2_combinations = permutations(models_2);
+console.log(model_2_combinations)
+
+//combine unique model combination orders with (static) emotion array to create
+//all possible unordered combinations of models and emotions, 
+//such that each model and emotion occurs uniquely within each array/ trial
+//also store relevant reward information
+for (i=0; i<model_1_combinations.length; i++) {
+  current_models = model_1_combinations[i];
+  current_combos=[];
+  for (j=0; j<current_models.length; j++) {
+    current_model = current_models[j];
+    current_emotion = emotions_1[j];
+    if (structure_condition == "emotion") {
+      current_reward_key = current_emotion
+    } else if (structure_condition == "model") {
+      current_reward_key = current_model
+    }
+
+    //add noise to the reward (potentially)
+    current_reward_adjusted = compute_reward(
+      reward_matrix_1[current_reward_key]["reward"],
+      noise_type,
+      reward_adj_factor,
+      reward_adj_shift)
+
+    console.log(current_reward_adjusted)
+
+    current_stimulus = {
+      "stimulus_id": current_model+img_sep+current_emotion,
+      "emotion": current_emotion,
+      "model": current_model,
+      "image": "stimuli/"+current_model+img_sep+current_emotion+img_ext,
+      "reward_unadjusted": reward_matrix_1[current_reward_key]["reward"],
+      "reward": current_reward_adjusted,
+      "reward_score": current_reward_adjusted*reward_depiction_factor,
+      "reward_image": "stimuli/stars_"+String(current_reward_adjusted)+".png",
+    }
+
+    current_combos.push(current_stimulus);
+  }
+  all_unique_trial_combinations_1.push(current_combos);
+}
+
+for (i=0; i<model_2_combinations.length; i++) {
+  current_models = model_2_combinations[i];
+  current_combos=[];
+  for (j=0; j<current_models.length; j++) {
+    current_model = current_models[j];
+    current_emotion = emotions_2[j];
+    if (structure_condition == "emotion") {
+      if (match_condition=="match") {
+        current_reward_key = current_emotion
+      } else if (match_condition=="mismatch") {
+        current_reward_key = current_model
+      }
+    } else if (structure_condition == "model") {
+      if (match_condition=="match") {
+        current_reward_key = current_model
+      } else if (match_condition=="mismatch") {
+        current_reward_key = current_emotion
+      }
+    }
+
+    console.log(reward_matrix_2);
+    console.log(current_reward_key);
+
+    current_reward_adjusted = compute_reward(
+      reward_matrix_2[current_reward_key]["reward"],
+      noise_type,
+      reward_adj_factor,
+      reward_adj_shift)
+
+    current_stimulus = {
+      "stimulus_id": current_model+img_sep+current_emotion,
+      "emotion": current_emotion,
+      "model": current_model,
+      "image": "stimuli/"+current_model+img_sep+current_emotion+img_ext,
+      "reward_unadjusted": reward_matrix_2[current_reward_key]["reward"],
+      "reward": current_reward_adjusted,
+      "reward_score": current_reward_adjusted*reward_depiction_factor,
+      "reward_image": "stimuli/stars_"+String(current_reward_adjusted)+".png",
+    }
+
+    current_combos.push(current_stimulus);
+  }
+  all_unique_trial_combinations_2.push(current_combos);
+}
+
+console.log(all_unique_trial_combinations_1);
+console.log(all_unique_trial_combinations_2);
+
+// construct all trials
+var num_blocks = 2; // one block is currently 24 trials, so 2 blocks is 48 trials
+var all_trials_1 = [];
+//var all_trials_2 = [];
+// put all trials together for each round based on the number of blocks
+for (i=0; i<num_blocks; i++) {
+  //shuffle block
+  var block_trials_shuffled_1=jsPsych.randomization.shuffle(all_unique_trial_combinations_1);
+  //var block_trials_shuffled_2=jsPsych.randomization.shuffle(all_unique_trial_combinations_2);
+
+  console.log(block_trials_shuffled_1);
+  //console.log(block_trials_shuffled_2);
+
+
+  //add to trial list
+  all_trials_1 = all_trials_1.concat(block_trials_shuffled_1);
+  //all_trials_2 = all_trials_2.concat(block_trials_shuffled_2);
+  console.log(all_trials_1);
+  //console.log(all_trials_2)
+}
+
+
+//combine into full trial list
+//var all_trials = all_trials_1.concat(all_trials_2);
+//var all_trials = all_trials_1;
+
+var all_trials = all_trials_1.slice(0,2);
+
+// create general parameters that will update dynamically
+var cur_score = 0
+var trial_counter = 1
+var previous_score = 0
+
+// function for constructing a trial
+function construct_trial(cur_trial,trial_num) {
+  //randomize position
+  current_trial_shuffled = jsPsych.randomization.shuffle(cur_trial);
+
+  console.log(current_trial_shuffled);
+
+  //get stimulus property arrays
+  trial_stimuli = [];
+  trial_emotions = [];
+  trial_models = [];
+  trial_rewards = [];
+  trial_rewards_unadjusted = [];
+  trial_reward_scores = [];
+  trial_reward_images = [];
+  for (j=0; j<current_trial_shuffled.length; j++) {
+    cur_trial_stimulus = current_trial_shuffled[j];
+    trial_stimuli.push(cur_trial_stimulus["image"]);
+    trial_emotions.push(cur_trial_stimulus["emotion"]);
+    trial_models.push(cur_trial_stimulus["model"]);
+    trial_rewards.push(cur_trial_stimulus["reward"]);
+    trial_rewards_unadjusted.push(cur_trial_stimulus["reward_unadjusted"]);
+    trial_reward_scores.push(cur_trial_stimulus["reward_score"]);
+    trial_reward_images.push(cur_trial_stimulus["reward_image"]);
+  }
+
+
+    var trial = {
+      type: 'explore-choice',
+      instruction: "Click on the image that will give you the most stars.",
+    stimuli: trial_stimuli,
+    reward_scores: trial_reward_scores,
+    reward_images: trial_reward_images,
+    emotions: trial_emotions,
+    models: trial_models,
+    reward_scores_unadjusted: trial_rewards_unadjusted,
+    rewards: trial_rewards,
+    data: {
+      "emotions": trial_emotions,
+      "models": trial_models,
+      "rewards": trial_rewards,
+      "rewards_unadjusted": trial_rewards_unadjusted,
+      "trial_num": trial_num,
+
+    },
+    on_start: function(trial) {
+      if (trial_counter > 1) {
+        trial.cur_score = cur_score;
+        console.log(cur_score);
+      }
+      trial_counter++;  
+    },
+    on_finish: function(data) {
+      cur_score = data.score_after_trial
+    }
+    };
+  
+    var show_reward = {
+      type: 'show-reward',
+      instruction: "",
+      // function() {
+      //   cur_reward = jsPsych.data.get().last(1).values()[0].reward;
+      //   instruction = "You got " + cur_reward + " stars!";
+      //   return instruction
+      // },
+      stimulus: function() {
+        console.log(jsPsych.data.get().last(1).values());
+        return jsPsych.data.get().last(1).values()[0].choiceImage
+      },
+      reward_image: function() {
+        return jsPsych.data.get().last(1).values()[0].reward_image
+      },
+      cur_reward: function() {
+        return jsPsych.data.get().last(1).values()[0].rewards[jsPsych.data.get().last(1).values()[0].choice_index]
+      },
+      cur_score: function() {
+        console.log(jsPsych.data.get().last(1).values()[0].score_after_trial)
+        return jsPsych.data.get().last(1).values()[0].score_after_trial
+      },
+      previous_score: function() {
+        if (jsPsych.data.get().last(1).values()[0].trial_num==1) {
+          return 0
+        } else {
+          console.log(jsPsych.data.get().last(2).values()[0].score_after_trial)
+          return jsPsych.data.get().last(2).values()[0].score_after_trial
+        }
+        
+      },
+      trial_duration: 2000
+    
+    }
+    timeline.push(trial);
+    timeline.push(show_reward);
+}
+
+//preload 
+var preload_images = all_images.concat(reward_images);
+console.log(preload_images);
+
+var preload = {
+    type: 'preload',
+    auto_preload: true,
+    images: preload_images,
+    message: "Please wait while the experiment loads."
+  }
+  timeline.push(preload);
+
+    //collect a participant identifier
+    var participant_id_entry = {
+    type: "survey-text",
+    questions: [{ prompt: "Please enter your participant ID (e.g. p1):", name: "participant_id" }],
+    on_finish: function (data) {
+      console.log(data.response)
+      jsPsych.data.addProperties({
+        participant: data.response.participant_id
+      });
+    }
+  };
+
+    // add participant_id_entry to timeline
+    timeline.push(participant_id_entry);
+
+  var enter_fullscreen = {
+  type: 'fullscreen',
+  fullscreen_mode: true
+}
+timeline.push(enter_fullscreen)
+  
+  
+//construct full experimental timeline
+  
+for (i=0; i<all_trials.length; i++) {
+
+  current_trial = all_trials[i];
+  console.log(current_trial);
+  trial_num = i+1;
+  construct_trial(current_trial,trial_num);
+  
+};
+
+var experiment_end = {
+    type: 'image-button-response',
+    stimulus: 'stimuli/star_jar.png',
+    stimulus_height: 150,
+    stimulus_width: 150,
+    prompt: function() {
+      final_score = Math.floor((jsPsych.data.get().last(1).values()[0].score_after_trial-1) / reward_depiction_factor);
+      return ['<p>Thank you for playing the game! You collected ' + String(final_score) + ' stars!</p>']
+    },
+    choices: ["Continue"]
+  }
+
+  timeline.push(experiment_end);
+
+
+//debrief and code message
+var experimentFinal = [];
+var final_instructions = {
+  type: 'html-button-response',
+  stimulus: "<p style='font-size:20px; font-weight:bold'>GREAT JOB, YOU'RE ALL DONE!</p><img src='stimuli/fireworks.gif'>",
+  choices: ["Finish"]
+};
+
+//add instructions trial to experiment
+experimentFinal.push(final_instructions);
+ 
+
+  jsPsych.init({
+    timeline: timeline,
+    show_progress_bar: true,
+    on_finish: function() {
+      //jsPsych.data.displayData();
+      jsPsych.init({
+        timeline: experimentFinal,
+        on_finish:
+        function(){
+          //redirect link
+          //var redirect_url = "";
+          //console.log(redirect_url);
+    //window.location = redirect_url;
+  }
+      });
+    }
+  });
+</script>
+
+</html>
