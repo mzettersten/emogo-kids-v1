@@ -90,26 +90,6 @@
     return updated_reward
   }
 
-
-
-  // ORGANIZE SUBJECT ID & GENERAL PARAMETERS
-
-  // get participant-specific url parameters from mTurk study link
-  var workerId = getParamFromURL('workerId');
-  var assignmentId = getParamFromURL('assignmentId');
-  var hitId = getParamFromURL('hitId');
-
-  var survey_code = getParamFromURL('id');
-
-  //make sure that nobody can enter anything damaging
-  workerId.replace(/[^A-Za-z0-9_]/g, "");
-  hitId.replace(/[^A-Za-z0-9_]/g, "");
-  assignmentId.replace(/[^A-Za-z0-9_]/g, "");
-
-  console.log(workerId);
-  console.log(hitId);
-  console.log(assignmentId);
-
   var timeline = [];
 
   /* init connection with pavlovia.org */
@@ -154,11 +134,9 @@
   // this adds a property called 'subject', a property called workerId, and a condition property
   jsPsych.data.addProperties({
     subject: subject_id,
-    workerId: workerId,
-    hitId: hitId,
-    assignmentId: assignmentId,
-    experiment_id: 979,
-    survey_code: survey_code,
+    // workerId: workerId,
+    // hitId: hitId,
+    // assignmentId: assignmentId,
     structure_condition: structure_condition,
     match_condition: match_condition,
     seed: random_seed,
@@ -592,6 +570,8 @@
         dateString += ('0' + date.getHours()).slice(-2) + 'h' + ('0' + date.getMinutes()).slice(-2) + '.' + ('0' + date.getSeconds()).slice(-2) + '.' + date.getMilliseconds();
         console.log(dateString)
 
+        var participant_identifier = jsPsych.data.get().last(1).values()[0].participant
+
         fetch("https://pipe.jspsych.org/api/data/", {
           method: "POST",
           headers: {
@@ -600,7 +580,7 @@
           },
           body: JSON.stringify({
             experimentID: "m4lN0jeU0Lrk",
-            filename: "emogo_kids_v1_" + subject_id + "_" + dateString + ".csv",
+            filename: "emogo_kids_v1_" + participant_identifier + "_" + dateString + ".csv",
             data: jsPsych.data.get().csv(),
           }),
         });
