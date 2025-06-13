@@ -661,6 +661,43 @@
     timeline.push(trial)
   };
 
+  // add naming emotions
+
+  // should use the kc ones? how to ensure it's the same faces
+  var all_faces = kc_combinations.flat();
+
+  var emotion_trials = all_faces.map(function(stim, index) {
+  return {
+    type: 'survey-text',
+    questions: [
+      {
+        prompt: '<div style="text-align:center;"><img src="' + stim.image + '" style="max-height:300px;"></div><p>What emotion is showing on this face?</p>',
+        name: 'emotion_id',
+        rows: 1,
+        columns: 60
+      }
+    ],
+    button_label: 'Submit',
+    data: {
+      stimulus_id: stim.stimulus_id,
+      trial_index: index
+    },
+    on_finish: function(data) {
+      console.log("Original Response.response: ", data.response);
+      data.user_response = data.response.emotion_id || "";
+      console.log("Response:", data.user_response);
+      console.log("stimulus_id: ", data.stimulus_id)
+    }
+
+  };
+});
+
+
+timeline.push({
+  timeline: emotion_trials
+});
+
+
 
 
   //debrief and code message
